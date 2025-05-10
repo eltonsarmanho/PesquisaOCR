@@ -51,7 +51,7 @@ PESQUISAOCR/
 
 - **CER** (Character Error Rate)
 - **WER** (Word Error Rate)
-- **Levenshtein Similarity e Distance)**
+- **Levenshtein Similarity e Distance**
 - **Tempo de processamento por documento**
 - **Eficiência (acurácia/tempo)**
 
