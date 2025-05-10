@@ -1,0 +1,14 @@
+# Ignorar pasta Arquivos e todo o seu conteúdo
+Arquivos/
+
+# Ignorar todos os arquivos CSV
+*.csv
+
+# Ignorar ambientes virtuais, arquivos temporários e caches Python (opcional mas recomendado)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+env/
+*.egg-info/
