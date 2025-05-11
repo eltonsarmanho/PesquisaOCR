@@ -1,4 +1,4 @@
-#!/home/eltonss/Documents/VSCodigo/PesquisaOCR/env/bin/python
+#!/home/eltonss/Documents/VSCodigo/PesquisaOCR/env/bin/python3
 
 import sys
 import json
