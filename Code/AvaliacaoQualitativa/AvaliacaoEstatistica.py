@@ -157,12 +157,13 @@ bars = plt.bar(df_metricas["modelo"], df_metricas["score_final"], color=color_li
 for bar in bars:
     height = bar.get_height()
     plt.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-             f'{height:.3f}', ha='center', va='bottom', fontsize=10)
+             f'{height:.3f}', ha='center', va='bottom', fontsize=15)
 
-plt.title("Score Final dos Modelos OCR", fontsize=15)
-plt.xlabel("Modelo", fontsize=12)
-plt.ylabel("Score Final", fontsize=12)
-plt.xticks(rotation=45)
+plt.title("Score Final dos Modelos OCR", fontsize=20)
+plt.xlabel("Modelo", fontsize=18)
+plt.ylabel("Score Final", fontsize=18)
+plt.xticks(rotation=45,fontsize=16)
+plt.yticks(fontsize=16)
 plt.tight_layout()
 plt.savefig("score_final_ocr_modelos.png", dpi=300, bbox_inches='tight')
 plt.show()
