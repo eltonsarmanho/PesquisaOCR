@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).parent.parent.parent
 print(BASE_DIR)
 OCR_DIR = BASE_DIR / "Arquivos" /"ocr_textos"
 GROUND_TRUTH_DIR = BASE_DIR / "Arquivos"  / "truth_textos"
-MODELOS = ["google_gemini", "google_vision", "aws_textract", "paddleocr", "pytesseract"]
+MODELOS = ["google_gemini", "google_vision", "aws_textract", "paddleocr", "pytesseract", "easyocr"]
 
 # Lista de arquivos ground truth
 arquivos_truth = list(GROUND_TRUTH_DIR.glob("*.txt"))
