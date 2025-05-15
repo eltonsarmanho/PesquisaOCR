@@ -43,26 +43,34 @@ load_dotenv(override=True)
 
 reader = easyocr.Reader(['pt'], gpu=False)
 def preprocess_image(image):
+    """
+    Pré-processa a imagem para melhorar a qualidade do OCR.
+    
+    Args:
+        image: Imagem PIL ou numpy array
+        
+    Returns:
+        Imagem pré-processada como numpy array
+    """
+    # Converte para numpy array se for imagem PIL
     image = np.array(image)
+    
+    # Converte para escala de cinza se for colorida
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     else:
         gray = image
 
-    # Normalização e aumento de contraste
+    # Normalização
     norm = cv2.normalize(gray, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
-    contrast = cv2.convertScaleAbs(norm, alpha=2.0, beta=0)  # Mais contraste
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe_img = clahe.apply(norm)
+        
+    gamma = 1.2
+    lut = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)]).astype("uint8")
+    final = cv2.LUT(clahe_img, lut)
+    return final
     
-    adaptive = cv2.adaptiveThreshold(
-    contrast, 255,
-    cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY,
-    blockSize=15, C=11)
-
-    # Denoising (remoção de ruídos sem borrar letras)
-    denoised = cv2.fastNlMeansDenoising(adaptive, h=30)
-
-    return denoised
-
 
 
 def preparar_arquivo_para_pdf2image(input_pdf):
