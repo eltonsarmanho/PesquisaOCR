@@ -109,7 +109,20 @@ def limpar_texto_ocr(texto_ocr: str) -> str:
             "CPF nº €": "CPF nº ",
             "aptº": "Apt.",
             "matricula": "matrícula",
-            "ficha": "Ficha"
+            "ficha": "Ficha",
+            "matricula": "matrícula", 
+            "ficha": "Ficha",
+            "imovel": "imóvel",
+            "area": "área",
+            "numero": "número",
+            "registro": "registro",
+            "cartorio": "cartório",
+            "escritura": "escritura",
+            "publica": "pública",
+            "municipio": "município",
+            "localizacao": "localização",
+            "proprietario": "proprietário",
+            "averbacao": "averbação"
         }
 
         for k, v in substituicoes.items():
