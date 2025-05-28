@@ -8,6 +8,27 @@ from pdf2image import convert_from_path
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..')))
+# Função para pré-processar imagem
+MODEL_PATH = os.path.join(os.path.dirname(__file__),'Real-ESRGAN', 'weights', 'RealESRGAN_x4plus_anime_6B.pth')
+print(MODEL_PATH)
+# Função para aplicar RealESRGAN a uma imagem numpy
+
+from basicsr.archs.rrdbnet_arch import RRDBNet
+
+from realesrgan.utils import RealESRGANer
+
+from PIL import Image
+
+
+model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
+upsampler = RealESRGANer(
+        scale=4,
+        model_path=MODEL_PATH,
+        model=model,
+        tile=64,
+        tile_pad=5,
+        pre_pad=2,
+        half=False)
 
 # Lista de documentos
 documentos = [
@@ -18,7 +39,29 @@ documentos = [
     "62406.txt", "62451.txt", "62489.txt", "62497.txt", "65716.txt",
     "65717.txt", "65718.txt", "65771.txt", "65772.txt"
 ]
+def aplicar_realesrgan(imagem_np: np.ndarray, scale: int = 2) -> np.ndarray:
+    """
+    Aplica super-resolução Real-ESRGAN a uma imagem em formato NumPy.
 
+    Parâmetros:
+    - imagem_np (np.ndarray): imagem de entrada em formato numpy
+    - scale (int): fator de escala (2 ou 4)
+
+    Retorna:
+    - imagem_np_superres (np.ndarray): imagem processada com super-resolução
+    """
+    
+    # Convertendo np.array (cv2 formatado em BGR) para RGB (PIL Image)
+    imagem_rgb = cv2.cvtColor(imagem_np, cv2.COLOR_BGR2RGB)
+    imagem_pil = Image.fromarray(imagem_rgb)
+    
+    # Aplicar super-resolução
+    output, _ = upsampler.enhance(np.array(imagem_pil), outscale=scale)
+
+    # Converte de volta para np.ndarray
+    imagem_superres = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+
+    return imagem_superres
 def show_image(title, img, cmap='gray'):
     plt.figure(figsize=(6, 6))
     plt.imshow(img, cmap=cmap)
@@ -26,7 +69,7 @@ def show_image(title, img, cmap='gray'):
     plt.axis('off')
     plt.show()
 
-def preprocess_image(image, quality_level='low'):
+def preprocess_image(image, quality_level='low',aplicar_superres=False):
     """
     Pré-processa a imagem para melhorar a qualidade do OCR.
     
@@ -40,7 +83,14 @@ def preprocess_image(image, quality_level='low'):
     # Converte para numpy array se for imagem PIL
     image = np.array(image)
     show_image("Original", image, cmap='gray' if len(image.shape) == 2 else None)
-    
+    if aplicar_superres:
+        try:
+            
+            image_sr = aplicar_realesrgan(image)
+            compare_with_original(image, image_sr, "superres")
+            return image_sr
+        except Exception as e:
+            print(f"[BSR Warning] Super resolução falhou: {e}")
     # Converte para escala de cinza se for colorida
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -134,7 +184,7 @@ def compare_with_original(original, processed, etapa, cmap='gray'):
     plt.tight_layout()
     plt.show()
 
-for doc in ["2301.txt"]:
+for doc in ["Passagem.txt"]:
     base = doc.removesuffix(".txt")
     pdf_file = Path(__file__).parent / "Arquivos" / "PDF" / f"{base}.pdf"
-    preprocess_image(convert_from_path(pdf_file, dpi=72)[0], quality_level='low')
+    preprocess_image(convert_from_path(pdf_file, dpi=72)[0], aplicar_superres=True,)

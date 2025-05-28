@@ -29,6 +29,8 @@ import boto3
 import tempfile
 from pdf2image import convert_from_path
 import tempfile
+from PIL import Image
+
 
 OCR_PYTESSERACT= 'pytesseract'
 OCR_PADDLE = 'paddleocr'
@@ -40,9 +42,29 @@ OCR_CALAMARI = 'calamari'
 # Carrega variáveis de ambiente
 load_dotenv(override=True)
 # Função para pré-processar imagem
+MODEL_PATH = os.path.join(os.path.dirname(__file__),"..", 'Real-ESRGAN', 'weights', 'RealESRGAN_x4plus_anime_6B.pth')
+print(MODEL_PATH)
+# Função para aplicar RealESRGAN a uma imagem numpy
 
-reader = easyocr.Reader(['pt'], gpu=False)
-def preprocess_image(image):
+from basicsr.archs.rrdbnet_arch import RRDBNet
+
+from realesrgan.utils import RealESRGANer
+
+from PIL import Image
+
+
+model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
+upsampler = RealESRGANer(
+        scale=4,
+        model_path=MODEL_PATH,
+        model=model,
+        tile=64,
+        tile_pad=5,
+        pre_pad=2,
+        half=False)
+
+#reader = easyocr.Reader(['pt'], gpu=False)
+def preprocess_image(image, aplicar_superres=False):
     """
     Pré-processa a imagem para melhorar a qualidade do OCR.
     
@@ -54,6 +76,15 @@ def preprocess_image(image):
     """
     # Converte para numpy array se for imagem PIL
     image = np.array(image)
+    
+    if aplicar_superres:
+        try:
+            
+            image_sr = aplicar_realesrgan(image)
+        
+            return image_sr
+        except Exception as e:
+            print(f"[BSR Warning] Super resolução falhou: {e}")
     
     # Converte para escala de cinza se for colorida
     if len(image.shape) == 3:
@@ -70,8 +101,6 @@ def preprocess_image(image):
     lut = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)]).astype("uint8")
     final = cv2.LUT(clahe_img, lut)
     return final
-    
-
 
 def preparar_arquivo_para_pdf2image(input_pdf):
     """
@@ -150,6 +179,32 @@ def limpar_texto_ocr(texto_ocr: str) -> str:
         texto_ocr)
 
         return texto_ocr.strip()
+
+   
+def aplicar_realesrgan(imagem_np: np.ndarray, scale: int = 2) -> np.ndarray:
+    """
+    Aplica super-resolução Real-ESRGAN a uma imagem em formato NumPy.
+
+    Parâmetros:
+    - imagem_np (np.ndarray): imagem de entrada em formato numpy
+    - scale (int): fator de escala (2 ou 4)
+
+    Retorna:
+    - imagem_np_superres (np.ndarray): imagem processada com super-resolução
+    """
+    
+    # Convertendo np.array (cv2 formatado em BGR) para RGB (PIL Image)
+    imagem_rgb = cv2.cvtColor(imagem_np, cv2.COLOR_BGR2RGB)
+    imagem_pil = Image.fromarray(imagem_rgb)
+    
+    # Aplicar super-resolução
+    output, _ = upsampler.enhance(np.array(imagem_pil), outscale=scale)
+
+    # Converte de volta para np.ndarray
+    imagem_superres = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
+
+    return imagem_superres
+
 def save_txt(texto,documento,metodo):
     pasta_destino = Path(__file__).parent.parent /"Arquivos"/ "ocr_textos"/metodo
     pasta_destino.mkdir(parents=True, exist_ok=True)
@@ -174,7 +229,7 @@ def extrair_texto(arquivo_pdf, ocr: str = "paddleocr", is_save_txt: bool = True)
 
     try:
         imagens = convert_from_path(caminho_pdf, dpi=300)
-        imagens_np = [np.array(preprocess_image(img)) for img in imagens]
+        imagens_np = [np.array(preprocess_image(img,aplicar_superres=True)) for img in imagens]
 
         if ocr == "pytesseract":
             texto = extrair_texto_pytesseract_imagens(imagens_np)

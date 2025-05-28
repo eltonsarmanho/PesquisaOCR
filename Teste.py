@@ -15,14 +15,15 @@ documentos = [
     "12690.txt", "12867.txt", "12878.txt", "13123.txt", "13164.txt",
     "17071.txt", "17074.txt", "17433.txt", "17434.txt", "22793.txt",
     "62406.txt", "62451.txt", "62489.txt", "62497.txt", "65716.txt",
-    "65717.txt", "65718.txt", "65771.txt", "65772.txt"
+    "65717.txt", "65718.txt", "65771.txt", "65772.txt",
 ]
+documentos =["MATRICULA RURAL - GREG.txt","2301.txt"]
 
 # Métodos OCR
 metodos_ocr = [
     OCR_Extrator_PDF_Matricula.OCR_PYTESSERACT,
     OCR_Extrator_PDF_Matricula.OCR_GOOGLE_VISION,
-    OCR_Extrator_PDF_Matricula.OCR_GOOGLE_GEMINI,
+    #OCR_Extrator_PDF_Matricula.OCR_GOOGLE_GEMINI,
     OCR_Extrator_PDF_Matricula.OCR_PADDLE,
     #OCR_Extrator_PDF_Matricula.OCR_GOOGLE_EASYOCR,
     OCR_Extrator_PDF_Matricula.OCR_AWS_TEXTRACT
