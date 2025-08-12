@@ -17,17 +17,24 @@ documentos = [
     "62406.txt", "62451.txt", "62489.txt", "62497.txt", "65716.txt",
     "65717.txt", "65718.txt", "65771.txt", "65772.txt",
 ]
-documentos =["MATRICULA RURAL - GREG.txt","2301.txt"]
+documentos =["MATRICULA RURAL - GREG.txt"]
+
+
 
 # Métodos OCR
 metodos_ocr = [
-    OCR_Extrator_PDF_Matricula.OCR_PYTESSERACT,
-    OCR_Extrator_PDF_Matricula.OCR_GOOGLE_VISION,
-    #OCR_Extrator_PDF_Matricula.OCR_GOOGLE_GEMINI,
-    OCR_Extrator_PDF_Matricula.OCR_PADDLE,
-    #OCR_Extrator_PDF_Matricula.OCR_GOOGLE_EASYOCR,
-    OCR_Extrator_PDF_Matricula.OCR_AWS_TEXTRACT
+    #OCR_Extrator_PDF_Matricula.OCR_PYTESSERACT,
+   # OCR_Extrator_PDF_Matricula.OCR_EASYOCR_GPU,  # Comentado devido a problemas com PyTorch
+    # OCR_Extrator_PDF_Matricula.OCR_GOOGLE_EASYOCR_CPU,  # Comentado devido a problemas com PyTorch
+    # OCR_Extrator_PDF_Matricula.OCR_GOOGLE_VISION,  # Requer credenciais
+    # OCR_Extrator_PDF_Matricula.OCR_GOOGLE_GEMINI,  # Requer credenciais
+    # OCR_Extrator_PDF_Matricula.OCR_AWS_TEXTRACT, # Requer credenciais
+    # OCR_Extrator_PDF_Matricula.OCR_PADDLE_CPU
+    OCR_Extrator_PDF_Matricula.OCR_PADDLE_GPU,  # Requer PaddleOCR instalado
+
 ]
+
+    
 
 # Caminho para salvar log de tempos
 csv_path = Path(__file__).parent / "tempo_extracao_ocr.csv"

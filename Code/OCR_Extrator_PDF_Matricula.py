@@ -1,70 +1,93 @@
 import os
 import sys
+import re
+import io
+import tempfile
+
+# Adiciona o diretório pai ao path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import cv2
-import numpy as np
-from pdf2image import convert_from_path
-from pathlib import Path
-from Code.Util import CredentialsEncoder
-from dotenv import load_dotenv
-import google.generativeai as genai
-
-import re
+# Imports de terceiros
 import cv2
 import numpy as np
 import pytesseract
+import boto3
+from pathlib import Path
 from pdf2image import convert_from_path
 from PIL import Image
-from paddleocr import PaddleOCR
-from google.cloud import vision
-import io
 from google.cloud import vision
 from google.oauth2 import service_account
-import easyocr  # Adicione no início, junto com os outros imports
-from boto3 import client
-from PIL import Image
-import os
-import boto3
-import tempfile
-from pdf2image import convert_from_path
-import tempfile
-from PIL import Image
+from dotenv import load_dotenv
+import google.generativeai as genai
 
+# Import condicional do PaddleOCR
+try:
+    from paddleocr import PaddleOCR
+    PADDLEOCR_AVAILABLE = True
+except ImportError as e:
+    print(f"PaddleOCR não disponível: {e}")
+    PADDLEOCR_AVAILABLE = False
 
-OCR_PYTESSERACT= 'pytesseract'
-OCR_PADDLE = 'paddleocr'
+# Import condicional do EasyOCR para evitar erros CUDA
+try:
+    import easyocr
+    EASYOCR_AVAILABLE = True
+except ImportError as e:
+    print(f"EasyOCR não disponível: {e}")
+    EASYOCR_AVAILABLE = False
+    easyocr = None
+
+# Imports locais
+from Code.Util import CredentialsEncoder
+
+# Constantes OCR
+OCR_PYTESSERACT = 'pytesseract'
+OCR_PYTESSERACT_PARALLEL = 'pytesseract_parallel'
+OCR_PADDLE_CPU = 'paddleocr_cpu'
+OCR_PADDLE_GPU = 'paddleocr_gpu'
 OCR_GOOGLE_VISION = 'google_vision'
 OCR_GOOGLE_GEMINI = 'google_gemini'
-OCR_GOOGLE_EASYOCR = 'easyocr'
+OCR_EASYOCR_GPU = 'easyocr_gpu'
+OCR_EASYOCR_CPU = 'easyocr_cpu'
 OCR_AWS_TEXTRACT = 'aws_textract'
-OCR_CALAMARI = 'calamari'
 # Carrega variáveis de ambiente
 load_dotenv(override=True)
-# Função para pré-processar imagem
-MODEL_PATH = os.path.join(os.path.dirname(__file__),"..", 'Real-ESRGAN', 'weights', 'RealESRGAN_x4plus_anime_6B.pth')
-print(MODEL_PATH)
-# Função para aplicar RealESRGAN a uma imagem numpy
 
-from basicsr.archs.rrdbnet_arch import RRDBNet
-
-from realesrgan.utils import RealESRGANer
-
-from PIL import Image
-
-
-model = RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=6, num_grow_ch=32, scale=4)
-upsampler = RealESRGANer(
-        scale=4,
-        model_path=MODEL_PATH,
-        model=model,
-        tile=64,
-        tile_pad=5,
-        pre_pad=2,
-        half=False)
+def verificar_gpu_disponivel():
+    """
+    Verifica se há GPU disponível para bibliotecas de OCR.
+    
+    Returns:
+        dict: Status de GPU para cada biblioteca
+    """
+    gpu_status = {
+        'pytorch_cuda': False,
+        'paddlepaddle_gpu': False,
+        'system_info': {}
+    }
+    
+    # Verificar PyTorch CUDA (para EasyOCR)
+    try:
+        import torch
+        gpu_status['pytorch_cuda'] = torch.cuda.is_available()
+        if torch.cuda.is_available():
+            gpu_status['system_info']['cuda_version'] = torch.version.cuda
+            gpu_status['system_info']['gpu_count'] = torch.cuda.device_count()
+            gpu_status['system_info']['gpu_name'] = torch.cuda.get_device_name(0)
+    except ImportError:
+        pass
+    
+    # Verificar PaddlePaddle GPU
+    try:
+        import paddle
+        gpu_status['paddlepaddle_gpu'] = paddle.is_compiled_with_cuda()
+    except ImportError:
+        pass
+    
+    return gpu_status
 
 #reader = easyocr.Reader(['pt'], gpu=False)
-def preprocess_image(image, aplicar_superres=False):
+def preprocess_image(image):
     """
     Pré-processa a imagem para melhorar a qualidade do OCR.
     
@@ -76,15 +99,6 @@ def preprocess_image(image, aplicar_superres=False):
     """
     # Converte para numpy array se for imagem PIL
     image = np.array(image)
-    
-    if aplicar_superres:
-        try:
-            
-            image_sr = aplicar_realesrgan(image)
-        
-            return image_sr
-        except Exception as e:
-            print(f"[BSR Warning] Super resolução falhou: {e}")
     
     # Converte para escala de cinza se for colorida
     if len(image.shape) == 3:
@@ -180,31 +194,6 @@ def limpar_texto_ocr(texto_ocr: str) -> str:
 
         return texto_ocr.strip()
 
-   
-def aplicar_realesrgan(imagem_np: np.ndarray, scale: int = 2) -> np.ndarray:
-    """
-    Aplica super-resolução Real-ESRGAN a uma imagem em formato NumPy.
-
-    Parâmetros:
-    - imagem_np (np.ndarray): imagem de entrada em formato numpy
-    - scale (int): fator de escala (2 ou 4)
-
-    Retorna:
-    - imagem_np_superres (np.ndarray): imagem processada com super-resolução
-    """
-    
-    # Convertendo np.array (cv2 formatado em BGR) para RGB (PIL Image)
-    imagem_rgb = cv2.cvtColor(imagem_np, cv2.COLOR_BGR2RGB)
-    imagem_pil = Image.fromarray(imagem_rgb)
-    
-    # Aplicar super-resolução
-    output, _ = upsampler.enhance(np.array(imagem_pil), outscale=scale)
-
-    # Converte de volta para np.ndarray
-    imagem_superres = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
-
-    return imagem_superres
-
 def save_txt(texto,documento,metodo):
     pasta_destino = Path(__file__).parent.parent /"Arquivos"/ "ocr_textos"/metodo
     pasta_destino.mkdir(parents=True, exist_ok=True)
@@ -222,27 +211,53 @@ def read_txt(documento,metodo):
         texto = f.read()
     return texto
 
-def extrair_texto(arquivo_pdf, ocr: str = "paddleocr", is_save_txt: bool = True) -> str:
+def extrair_texto(arquivo_pdf, ocr: str = "pytesseract", is_save_txt: bool = True, use_gpu: bool = True) -> str:
+    """
+    Extrai texto de um arquivo PDF usando diferentes métodos OCR.
     
+    Args:
+        arquivo_pdf: Caminho para o arquivo PDF ou bytes do PDF
+        ocr: Método OCR a ser usado ('pytesseract', 'paddleocr', 'easyocr', etc.)
+        is_save_txt: Se deve salvar o texto extraído em arquivo
+        use_gpu: Se deve tentar usar GPU (quando disponível). False força uso de CPU
+        
+    Returns:
+        Texto extraído do PDF
+    """
 
     caminho_pdf, arquivo_temp = preparar_arquivo_para_pdf2image(arquivo_pdf)
 
     try:
         imagens = convert_from_path(caminho_pdf, dpi=300)
-        imagens_np = [np.array(preprocess_image(img,aplicar_superres=True)) for img in imagens]
+        imagens_np = [np.array(preprocess_image(img)) for img in imagens]
 
         if ocr == "pytesseract":
-            texto = extrair_texto_pytesseract_imagens(imagens_np)
-        elif ocr == "paddleocr":
-            texto = extrair_texto_PaddleOCR_imagens(imagens_np)
-        elif ocr == "easyocr":
-            texto = extrair_texto_easyocr_imagens(imagens_np)
+            texto = extrair_texto_pytesseract_imagens(imagens_np, use_parallel=False)
+        elif ocr == "pytesseract_parallel":
+            texto = extrair_texto_pytesseract_imagens(imagens_np, use_parallel=True)
+        elif ocr == "paddleocr_gpu":
+            if not PADDLEOCR_AVAILABLE:
+                raise ImportError("PaddleOCR não está disponível. Execute: pip install paddleocr")
+            texto = extrair_texto_PaddleOCR_imagens(imagens_np, use_gpu=use_gpu)
+        elif ocr == "paddleocr_cpu":
+            if not PADDLEOCR_AVAILABLE:
+                raise ImportError("PaddleOCR não está disponível. Execute: pip install paddleocr")
+            texto = extrair_texto_PaddleOCR_imagens(imagens_np, use_gpu=False)       
+        elif ocr == "easyocr_gpu":
+            if not EASYOCR_AVAILABLE:
+                raise ImportError("EasyOCR não está disponível devido a problemas com PyTorch/CUDA")
+            texto = extrair_texto_easyocr_imagens(imagens_np, use_gpu=use_gpu)
+        elif ocr == "easyocr_cpu":
+            if not EASYOCR_AVAILABLE:
+                raise ImportError("EasyOCR não está disponível devido a problemas com PyTorch/CUDA")
+            texto = extrair_texto_easyocr_imagens(imagens_np, use_gpu=False)        
         elif ocr == "google_vision":
             texto = extrair_texto_google_vision_imagens(imagens_np)
         elif ocr == "google_gemini":
             texto = extrair_texto_google_gemini_imagens(imagens_np)
         elif ocr == "aws_textract":
             texto = extrair_texto_aws_imagens(imagens_np)
+        
         else:
             raise ValueError(f"OCR {ocr} não reconhecido")
 
@@ -256,30 +271,182 @@ def extrair_texto(arquivo_pdf, ocr: str = "paddleocr", is_save_txt: bool = True)
             arquivo_temp.close()
             os.unlink(arquivo_temp.name)
 
-def extrair_texto_pytesseract_imagens(imagens_np):
-    custom_config = r"--oem 3 --psm 11 -l por"
-    texto_completo = []
-    for i, imagem_np in enumerate(imagens_np):
-        numero_pagina = i + 1
-        texto_pagina = pytesseract.image_to_string(imagem_np, config=custom_config)
-        texto_marcado = f"-- INÍCIO PÁGINA {numero_pagina} ---\n{texto_pagina}\n--- FIM PÁGINA {numero_pagina} ---\n"
-        texto_completo.append(texto_marcado)
+def extrair_texto_pytesseract_imagens(imagens_np, use_parallel=True):
+    """
+    Extrai texto usando PyTesseract com otimizações de performance.
+    
+    Args:
+        imagens_np: Lista de imagens em formato numpy
+        use_parallel: Se True, usa processamento paralelo (simulado com threading)
+    
+    Returns:
+        Texto extraído e limpo
+    """
+    # Configuração otimizada do Tesseract
+    custom_config = r"--oem 3 --psm 11 -l por -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ0123456789.,;:!?()[]{}+-*/%=<>@#$&_ "
+    
+    if use_parallel and len(imagens_np) > 1:
+        # Processamento paralelo usando threading (já que PyTesseract libera GIL para I/O)
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
+        
+        def processar_pagina(args):
+            i, imagem_np = args
+            numero_pagina = i + 1
+            try:
+                texto_pagina = pytesseract.image_to_string(imagem_np, config=custom_config)
+                return numero_pagina, texto_pagina
+            except Exception as e:
+                print(f"Erro ao processar página {numero_pagina}: {e}")
+                return numero_pagina, f"[ERRO AO PROCESSAR PÁGINA: {e}]"
+        
+        # Usar ThreadPoolExecutor para paralelizar
+        with ThreadPoolExecutor(max_workers=min(4, len(imagens_np))) as executor:
+            resultados = list(executor.map(processar_pagina, enumerate(imagens_np)))
+        
+        # Ordenar resultados por número da página
+        resultados.sort(key=lambda x: x[0])
+        
+        texto_completo = []
+        for numero_pagina, texto_pagina in resultados:
+            texto_marcado = f"-- INÍCIO PÁGINA {numero_pagina} ---\n{texto_pagina}\n--- FIM PÁGINA {numero_pagina} ---\n"
+            texto_completo.append(texto_marcado)
+    else:
+        # Processamento sequencial tradicional
+        texto_completo = []
+        for i, imagem_np in enumerate(imagens_np):
+            numero_pagina = i + 1
+            try:
+                texto_pagina = pytesseract.image_to_string(imagem_np, config=custom_config)
+            except Exception as e:
+                print(f"Erro ao processar página {numero_pagina}: {e}")
+                texto_pagina = f"[ERRO AO PROCESSAR PÁGINA: {e}]"
+            
+            texto_marcado = f"-- INÍCIO PÁGINA {numero_pagina} ---\n{texto_pagina}\n--- FIM PÁGINA {numero_pagina} ---\n"
+            texto_completo.append(texto_marcado)
+    
     return limpar_texto_ocr("\n".join(texto_completo))
 
-def extrair_texto_PaddleOCR_imagens(imagens_np):
-    ocr = PaddleOCR(use_angle_cls=True, lang='pt', show_log=False)
+def extrair_texto_PaddleOCR_imagens(imagens_np, use_gpu=True):
+    """
+    Extrai texto usando PaddleOCR.
+    
+    Args:
+        imagens_np: Lista de imagens em formato numpy
+        use_gpu: Se deve tentar usar GPU (True) ou forçar CPU (False)
+        
+    Returns:
+        Texto extraído e limpo
+    """
+    if not PADDLEOCR_AVAILABLE:
+        raise ImportError("PaddleOCR não está disponível. Execute: pip install paddleocr")
+    
+    try:
+        if use_gpu:
+            # Tentar inicializar PaddleOCR com GPU se disponível
+            try:
+                ocr = PaddleOCR(
+                    use_angle_cls=True,
+                    lang='pt',
+                    use_gpu=True,
+                    show_log=False
+                )
+                print("✅ PaddleOCR inicializado com GPU")
+            except Exception as gpu_error:
+                print(f"⚠️  GPU não disponível para PaddleOCR, usando CPU: {gpu_error}")
+                # Fallback para CPU
+                ocr = PaddleOCR(
+                    use_angle_cls=True,
+                    lang='pt',
+                    use_gpu=False,
+                    show_log=False
+                )
+        else:
+            # Forçar uso de CPU
+            print("🔧 PaddleOCR configurado para usar CPU (use_gpu=False)")
+            ocr = PaddleOCR(
+                use_angle_cls=True,
+                lang='pt',
+                use_gpu=False,
+                show_log=False
+            )
+    except Exception as e:
+        print(f"Erro ao inicializar PaddleOCR: {e}")
+        raise ImportError(f"Não foi possível inicializar PaddleOCR: {e}")
+    
     texto_completo = []
     for i, imagem_np in enumerate(imagens_np):
         numero_pagina = i + 1
-        resultados = ocr.ocr(imagem_np, cls=True)
-        textos_pagina = [texto for box, (texto, conf) in resultados[0]]
-        texto_pagina = "\n".join(textos_pagina)
+        try:
+            # Executar OCR
+            resultados = ocr.ocr(imagem_np)
+
+            if resultados and len(resultados) > 0 and resultados[0]:
+                textos_pagina = []
+                for item in resultados[0]:
+                    try:
+                        # PaddleOCR retorna formato: [[[x1,y1],[x2,y2],[x3,y3],[x4,y4]], (texto, confiança)]
+                        # Verificar se o item tem pelo menos 2 elementos
+                        if isinstance(item, (list, tuple)) and len(item) >= 2:
+                            # O segundo elemento contém (texto, confiança)
+                            texto_info = item[1]
+                            if isinstance(texto_info, (list, tuple)) and len(texto_info) >= 1:
+                                texto = str(texto_info[0]).strip()
+                                if texto:
+                                    textos_pagina.append(texto)
+                            elif isinstance(texto_info, str):
+                                # Caso seja uma string diretamente
+                                texto = texto_info.strip()
+                                if texto:
+                                    textos_pagina.append(texto)
+                    except (ValueError, IndexError, TypeError) as e:
+                        print(f"Erro ao processar item na página {numero_pagina}: {e}")
+                        # Debug: mostrar a estrutura do item problemático
+                        print(f"Item problemático: {item}")
+                        continue
+                
+                texto_pagina = "\n".join(textos_pagina) if textos_pagina else "[PÁGINA SEM TEXTO DETECTADO]"
+            else:
+                texto_pagina = "[PÁGINA SEM TEXTO DETECTADO]"
+                
+        except Exception as e:
+            print(f"Erro ao executar OCR na página {numero_pagina}: {e}")
+            texto_pagina = f"[ERRO AO PROCESSAR PÁGINA: {e}]"
+            
         texto_marcado = f"\n--- INÍCIO PÁGINA {numero_pagina} ---\n{texto_pagina}\n--- FIM PÁGINA {numero_pagina} ---\n"
         texto_completo.append(texto_marcado)
+    
     return limpar_texto_ocr("\n".join(texto_completo))
 
-def extrair_texto_easyocr_imagens(imagens_np):
-    reader = easyocr.Reader(['pt'], gpu=False, verbose=False)
+def extrair_texto_easyocr_imagens(imagens_np, reader=None, use_gpu=True):
+    """
+    Extrai texto usando EasyOCR.
+    
+    Args:
+        imagens_np: Lista de imagens em formato numpy
+        reader: Reader EasyOCR pré-configurado (opcional)
+        use_gpu: Se deve tentar usar GPU (True) ou forçar CPU (False)
+        
+    Returns:
+        Texto extraído e limpo
+    """
+    if not EASYOCR_AVAILABLE:
+        raise ImportError("EasyOCR não está disponível devido a problemas com PyTorch/CUDA")
+    
+    if reader is None:
+        if use_gpu:
+            # Tentar usar GPU se disponível, caso contrário usar CPU
+            try:
+                reader = easyocr.Reader(['pt'], gpu=True, verbose=False)
+                print("✅ EasyOCR inicializado com GPU")
+            except Exception as e:
+                print(f"⚠️  GPU não disponível para EasyOCR, usando CPU: {e}")
+                reader = easyocr.Reader(['pt'], gpu=False, verbose=False)
+        else:
+            # Forçar uso de CPU
+            print("🔧 EasyOCR configurado para usar CPU (use_gpu=False)")
+            reader = easyocr.Reader(['pt'], gpu=False, verbose=False)
+    
     texto_completo = []
     for i, img_np in enumerate(imagens_np):
         numero_pagina = i + 1
@@ -365,3 +532,4 @@ def extrair_texto_aws_imagens(imagens_np):
         texto_marcado = f"\n--- INÍCIO PÁGINA {numero_pagina} ---\n{texto_pagina}\n--- FIM PÁGINA {numero_pagina} ---\n"
         texto_completo.append(texto_marcado)
     return limpar_texto_ocr("\n".join(texto_completo))
+

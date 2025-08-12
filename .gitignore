@@ -1,14 +1,210 @@
-# Ignorar pasta Arquivos e todo o seu conteúdo
+# =============================================================================
+# DADOS E ARQUIVOS DE TESTE (ESPECÍFICOS DO PROJETO OCR)
+# =============================================================================
+
+# Ignorar pasta Arquivos e todo o seu conteúdo (PDFs, textos extraídos, etc.)
 Arquivos/
 
-# Ignorar todos os arquivos CSV
+# Ignorar resultados de testes e relatórios
 *.csv
+*.xlsx
+*.json
+resultados_*/
+relatorios_*/
+logs/
+*.log
 
-# Ignorar ambientes virtuais, arquivos temporários e caches Python (opcional mas recomendado)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.env
+# =============================================================================
+# AMBIENTES VIRTUAIS PYTHON
+# =============================================================================
+
+# Ambientes virtuais
+venv/
+venv-*/
 env/
+.env
+.venv
+ENV/
+env.bak/
+venv.bak/
+
+# =============================================================================
+# ARQUIVOS PYTHON TEMPORÁRIOS E CACHE
+# =============================================================================
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribuição / empacotamento
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# =============================================================================
+# ARQUIVOS BINÁRIOS E MULTIMÍDIA
+# =============================================================================
+
+# Documentos binários
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+
+# Imagens
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.tif
+*.ico
+*.svg
+*.webp
+
+# Vídeos
+*.mp4
+*.avi
+*.mov
+*.wmv
+*.flv
+*.webm
+*.mkv
+
+# Áudios
+*.mp3
+*.wav
+*.flac
+*.aac
+*.ogg
+*.wma
+
+# Arquivos comprimidos
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+
+# =============================================================================
+# ARQUIVOS DE SISTEMA E EDITORES
+# =============================================================================
+
+# Sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# =============================================================================
+# CREDENCIAIS E CONFIGURAÇÕES SENSÍVEIS
+# =============================================================================
+
+# Arquivos de credenciais
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+credentials.json
+*_credentials.json
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Configurações específicas de OCR
+google_credentials.json
+aws_credentials.json
+azure_credentials.json
+
+# =============================================================================
+# MODELOS E ARQUIVOS GRANDES DE ML/OCR
+# =============================================================================
+
+# Modelos treinados
+*.model
+*.pkl
+*.h5
+*.hdf5
+*.pb
+models/
+checkpoints/
+
+# Dados de treinamento grandes
+datasets/
+training_data/
+*.npz
+*.npy
+
+# =============================================================================
+# ARQUIVOS TEMPORÁRIOS ESPECÍFICOS DE OCR
+# =============================================================================
+
+# Arquivos temporários de OCR
+temp_*
+tmp_*
+*.tmp
+*.temp
+ocr_temp/
+processed_images/
+temp_extractions/
